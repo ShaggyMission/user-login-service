@@ -1,0 +1,71 @@
+openapi: 3.0.0
+info:
+  title: Role Assignment API
+  version: 1.0.0
+  description: >
+    This API allows assigning specific roles to users in the system.  
+    If the role does not exist, it will be created automatically before being assigned.  
+    **Both `userId` and `roleName` are required fields.**  
+    A `400 Bad Request` is returned if either field is missing.  
+    On successful assignment, a confirmation message is returned.  
+    Errors during processing will result in a `500 Internal Server Error`.
+
+paths:
+  /roles/assign-role:
+    post:
+      summary: Assign a role to a user
+      description: >
+        Assigns a role to a specified user.  
+        If the role does not already exist in the database, it will be created automatically.  
+        This endpoint helps manage user permissions and access control within the system.
+      tags:
+        - Role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - roleName
+              properties:
+                userId:
+                  type: string
+                  example: user123
+                  description: The unique identifier of the user. **Required.**
+                roleName:
+                  type: string
+                  example: Admin
+                  description: The name of the role to assign. **Required.** Will be created if it does not exist.
+      responses:
+        '201':
+          description: Role assigned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Role 'Admin' assigned to user user123.
+        '400':
+          description: Bad Request – Missing required fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: userId and roleName are required.
+        '500':
+          description: Internal Server Error – Failed to assign role
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server error during role assignment.
