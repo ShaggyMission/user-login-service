@@ -1,5 +1,6 @@
-const bcrypt = require('bcrypt');
+const axios = require('axios');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 const User = require('../models/userModel');
 
 const loginUser = async (req, res) => {
@@ -17,8 +18,11 @@ const loginUser = async (req, res) => {
     if (!isPasswordValid)
       return res.status(401).json({ message: 'Invalid password.' });
 
+    const roleResponse = await axios.get(`http://localhost:3003/roles/user-role/${user.id}`);
+    const role = roleResponse.data.role || 'NoRole';
+
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
+      { userId: user.id, email: user.email, role },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
