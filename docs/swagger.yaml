@@ -1,25 +1,35 @@
+
 openapi: 3.0.0
 info:
-  title: Role Assignment API
+  title: User Login Service API
   version: 1.0.0
   description: >
-    This API allows assigning specific roles to users in the system.  
-    If the role does not exist, it will be created automatically before being assigned.  
-    **Both `userId` and `roleName` are required fields.**  
-    A `400 Bad Request` is returned if either field is missing.  
-    On successful assignment, a confirmation message is returned.  
-    Errors during processing will result in a `500 Internal Server Error`.
+    This API provides authentication services for user login and logout functionality.  
+    The service handles user authentication by validating credentials against a MySQL database,
+    retrieves user roles from an external role service, and manages JWT tokens via HTTP-only cookies.  
+    **Both `email` and `password` are required fields for login.**  
+    Successful authentication returns a JWT token stored as an HTTP-only cookie for security.  
+    The service integrates with a role management system to include user roles in the authentication token.
+
+servers:
+  - url: http://localhost:3002
+    description: Development server
 
 paths:
-  /roles/assign-role:
+  /auth/login:
     post:
-      summary: Assign a role to a user
+      summary: Authenticate user and create session
       description: >
-        Assigns a role to a specified user.  
-        If the role does not already exist in the database, it will be created automatically.  
-        This endpoint helps manage user permissions and access control within the system.
+        Authenticates a user with email and password credentials.  
+        On successful authentication, the service:
+        1. Validates the provided credentials against the database
+        2. Retrieves the user's role from the role service (port 3003)
+        3. Generates a JWT token containing user information and role
+        4. Sets an HTTP-only cookie with the token for session management
+        
+        The JWT token expires in 24 hours and includes userId, email, and role information.
       tags:
-        - Role
+        - Authentication
       requestBody:
         required: true
         content:
@@ -27,20 +37,39 @@ paths:
             schema:
               type: object
               required:
-                - userId
-                - roleName
+                - email
+                - password
               properties:
-                userId:
+                email:
                   type: string
-                  example: user123
-                  description: The unique identifier of the user. **Required.**
-                roleName:
+                  format: email
+                  example: "user@example.com"
+                  description: The user's email address. **Required.**
+                password:
                   type: string
-                  example: Admin
-                  description: The name of the role to assign. **Required.** Will be created if it does not exist.
+                  format: password
+                  example: "securePassword123"
+                  description: The user's password. **Required.**
+            examples:
+              valid_login:
+                summary: Valid login credentials
+                value:
+                  email: "john.doe@example.com"
+                  password: "mySecurePassword"
+              admin_login:
+                summary: Admin user login
+                value:
+                  email: "admin@company.com"
+                  password: "adminPassword123"
       responses:
-        '201':
-          description: Role assigned successfully
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              description: JWT token set as HTTP-only cookie
+              schema:
+                type: string
+                example: "token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; HttpOnly; Max-Age=86400; SameSite=Lax"
           content:
             application/json:
               schema:
@@ -48,7 +77,17 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Role 'Admin' assigned to user user123.
+                    example: "Login successful"
+                  userId:
+                    type: string
+                    example: "12345"
+                    description: The unique identifier of the authenticated user
+              examples:
+                successful_login:
+                  summary: Successful authentication
+                  value:
+                    message: "Login successful"
+                    userId: "67890"
         '400':
           description: Bad Request – Missing required fields
           content:
@@ -58,9 +97,14 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: userId and roleName are required.
-        '500':
-          description: Internal Server Error – Failed to assign role
+                    example: "Email and password are required."
+              examples:
+                missing_fields:
+                  summary: Missing email or password
+                  value:
+                    message: "Email and password are required."
+        '401':
+          description: Unauthorized – Invalid password
           content:
             application/json:
               schema:
@@ -68,4 +112,124 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Server error during role assignment.
+                    example: "Invalid password."
+              examples:
+                invalid_password:
+                  summary: Wrong password provided
+                  value:
+                    message: "Invalid password."
+        '404':
+          description: Not Found – User does not exist
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User not found."
+              examples:
+                user_not_found:
+                  summary: Email not registered
+                  value:
+                    message: "User not found."
+        '500':
+          description: Internal Server Error – Database or role service error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Internal server error"
+              examples:
+                server_error:
+                  summary: Database connection or role service failure
+                  value:
+                    message: "Internal server error"
+
+  /auth/logout:
+    post:
+      summary: Logout user and clear session
+      description: >
+        Logs out the currently authenticated user by clearing the JWT token cookie.  
+        This endpoint effectively terminates the user's session by removing the authentication cookie.  
+        No request body is required as the logout process simply clears the stored cookie.  
+        This endpoint always returns success, even if no user was previously logged in.
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: Logout successful
+          headers:
+            Set-Cookie:
+              description: Clears the authentication token cookie
+              schema:
+                type: string
+                example: "token=; Max-Age=0"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Logged out successfully."
+              examples:
+                successful_logout:
+                  summary: User logged out
+                  value:
+                    message: "Logged out successfully."
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+      description: JWT token stored as HTTP-only cookie
+
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+        password:
+          type: string
+          format: password
+          description: User's password
+    
+    LoginResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Success message
+        userId:
+          type: string
+          description: Unique user identifier
+    
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Error description
+
+    LogoutResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Logout confirmation message
+
+tags:
+  - name: Authentication
+    description: User authentication and session management operations

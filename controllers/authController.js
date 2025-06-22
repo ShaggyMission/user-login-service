@@ -2,6 +2,8 @@ const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const User = require('../models/userModel');
+const JWT_SECRET = 'una_clave_secreta_segura';
+const JWT_EXPIRES_IN = '1d';
 
 const loginUser = async (req, res) => {
   try {
