@@ -2,13 +2,33 @@ name: Docker Image
 
 on:
   push:
-    branches: 
+    branches:
       - "main"
 
 jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run tests
+      run: npm test
+
   build-and-push:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
+    needs: test
 
     steps:
     - name: Checkout code
@@ -23,8 +43,8 @@ jobs:
     - name: Get the version number
       id: version
       run: |
-        VERSION_TAG="v$(date +'%Y%m%d%H%M%S')"  
-        echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_ENV  
+        VERSION_TAG="v$(date +'%Y%m%d%H%M%S')"
+        echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_ENV
 
     - name: Build and push Docker image
       run: |
@@ -44,8 +64,7 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
-        port: 22 
-        
+        port: 22
         script: |
           sudo docker --version || sudo apt install -y docker
           sudo service docker start || true
@@ -53,5 +72,5 @@ jobs:
           sudo docker pull lissethpacheco/user-login-service:latest
 
           sudo docker rm -f user-login-service 2>/dev/null || true
-          
+
           sudo docker run -d --name user-login-service -p 3002:3002 lissethpacheco/user-login-service:latest
