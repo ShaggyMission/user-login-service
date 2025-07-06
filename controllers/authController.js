@@ -20,7 +20,7 @@ const loginUser = async (req, res) => {
     if (!isPasswordValid)
       return res.status(401).json({ message: 'Invalid password.' });
 
-    const roleResponse = await axios.get(`http://localhost:3003/roles/user-role/${user.id}`);
+    const roleResponse = await axios.get(`http://34.232.173.120:3003/roles/user-role/${user.id}`);
     const role = roleResponse.data.role || 'NoRole';
 
     const token = jwt.sign(
