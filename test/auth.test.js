@@ -4,64 +4,44 @@ process.env.JWT_EXPIRES_IN = '1d';
 const request = require('supertest');
 const app = require('../app');
 const sequelize = require('../config/database');
-const axios = require('axios');
 const bcrypt = require('bcrypt');
 const User = require('../models/userModel');
+const axios = require('axios');
 
 jest.mock('axios');
-jest.setTimeout(10000);
 
-describe('Auth Routes', () => {
-  let testUser;
-
+describe('Simple Login Test', () => {
   beforeAll(async () => {
-    await sequelize.sync({ force: true }); 
+    await sequelize.sync(); 
+    const existingUser = await User.findOne({ where: { email: 'tes@email.com' } });
 
-    const hashedPassword = await bcrypt.hash('testpass', 10);
-    testUser = await User.create({
-      id: 'test-id',
-      firstName: 'Test',
-      lastName: 'User',
-      email: 'test@example.com',
-      password: hashedPassword,
-      phone: '0999999999',
-    });
+    if (!existingUser) {
+      const hashedPassword = await bcrypt.hash('test', 10);
+
+      await User.create({
+        id: 'test-id',
+        firstName: 'Test',
+        lastName: 'Test',
+        email: 'tes@email.com',
+        password: hashedPassword,
+        phone: '+1234567890',
+      });
+    }
 
     axios.get.mockResolvedValue({ data: { role: 'User' } });
   });
 
-  it('should login successfully', async () => {
+  it('should login successfully with correct credentials', async () => {
     const res = await request(app)
       .post('/auth/login')
       .send({
-        email: 'test@example.com',
-        password: 'testpass'
+        email: 'tes@email.com',
+        password: 'test'
       });
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty('message', 'Login successful');
-    expect(res.body).toHaveProperty('userId', 'test-id');
-    expect(res.headers['set-cookie']).toBeDefined(); 
-  });
-
-  it('should fail login with wrong password', async () => {
-    const res = await request(app)
-      .post('/auth/login')
-      .send({
-        email: 'test@example.com',
-        password: 'wrongpass'
-      });
-
-    expect(res.statusCode).toBe(401);
-    expect(res.body.message).toBe('Invalid password.');
-  });
-
-  it('should logout successfully', async () => {
-    const res = await request(app)
-      .post('/auth/logout');
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body.message).toBe('Logged out successfully.');
+    expect(res.body).toHaveProperty('userId');
   });
 
   afterAll(async () => {

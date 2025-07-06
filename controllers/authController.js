@@ -2,6 +2,7 @@ const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const User = require('../models/userModel');
+
 const JWT_SECRET = 'una_clave_secreta_segura';
 const JWT_EXPIRES_IN = '1d';
 
@@ -20,13 +21,18 @@ const loginUser = async (req, res) => {
     if (!isPasswordValid)
       return res.status(401).json({ message: 'Invalid password.' });
 
-    const roleResponse = await axios.get(`http://34.232.173.120:3003/roles/user-role/${user.id}`);
-    const role = roleResponse.data.role || 'NoRole';
+    let role = 'NoRole';
+    try {
+      const roleResponse = await axios.get(`http://34.232.173.120:3003/roles/user-role/${user.id}`);
+      role = roleResponse.data.role || 'NoRole';
+    } catch (error) {
+      console.warn('No role found or error fetching role:', error.message);
+    }
 
     const token = jwt.sign(
       { userId: user.id, email: user.email, role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
     );
 
     res.cookie('token', token, {
