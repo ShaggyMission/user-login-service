@@ -47,4 +47,3 @@ describe('Simple Login Test', () => {
   afterAll(async () => {
     await sequelize.close();
   });
-});
